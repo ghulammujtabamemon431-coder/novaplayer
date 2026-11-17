@@ -18,12 +18,24 @@ jobs:
       - run: npm install
       - run: |
           mkdir -p assets
-          for f in assets/icon.png assets/adaptive-icon.png assets/splash.png assets/favicon.png; do
-            if [ ! -f "$f" ]; then
-              echo "[STRIPPED 92 bytes]" | base64 -d > "$f"
-              echo "Created missing $f"
-            fi
-          done
+          python3 -c "
+          import os, zlib, struct
+          def png(path):
+              w=h=1024
+              raw=b''.join([b'\x00'+b'\xff\xff\xff'*w for _ in range(h)])
+              def chunk(t,d):
+                  c=t+d
+                  return struct.pack('>I',len(d))+c+struct.pack('>I',zlib.crc32(c)&0xffffffff)
+              data=b'\x89PNG\r\n\x1a\n'
+              data+=chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))
+              data+=chunk(b'IDAT',zlib.compress(raw))
+              data+=chunk(b'IEND',b'')
+              open(path,'wb').write(data)
+          for f in ['assets/icon.png','assets/adaptive-icon.png','assets/splash.png','assets/favicon.png']:
+              if not os.path.exists(f):
+                  png(f)
+                  print('Created',f)
+          "
       - run: npx expo prebuild --platform android --clean
       - run: |
           cd android
