@@ -3,6 +3,9 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CI: true
+      EXPO_NO_TELEMETRY: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -13,7 +16,15 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: npm install
-      - run: npx expo prebuild --platform android --non-interactive
+      - run: |
+          mkdir -p assets
+          for f in assets/icon.png assets/adaptive-icon.png assets/splash.png assets/favicon.png; do
+            if [ ! -f "$f" ]; then
+              echo "[STRIPPED 92 bytes]" | base64 -d > "$f"
+              echo "Created missing $f"
+            fi
+          done
+      - run: npx expo prebuild --platform android --clean
       - run: |
           cd android
           chmod +x gradlew
