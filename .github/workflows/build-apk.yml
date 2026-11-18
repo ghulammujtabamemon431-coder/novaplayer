@@ -50,6 +50,17 @@ jobs:
           PY
       - run: npx expo prebuild --platform android --clean
       - run: |
+          python3 - << 'PY'
+          import pathlib
+          p = pathlib.Path("android/app/build.gradle")
+          t = p.read_text()
+          if "signingConfig signingConfigs.debug" not in t:
+              t = t.replace("release {", "release {\n            signingConfig signingConfigs.debug", 1)
+          p.write_text(t)
+          print("Patched signing")
+          print(t[t.find("buildTypes"):t.find("buildTypes")+500])
+          PY
+      - run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
