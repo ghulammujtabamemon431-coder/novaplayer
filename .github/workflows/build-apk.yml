@@ -15,8 +15,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: npm install
-      - run: npx expo install --fix
+      - run: |
+          rm -rf node_modules package-lock.json android
+          npm install expo@latest
+          npx expo install --fix
       - run: |
           mkdir -p assets
           python3 << 'PY'
@@ -50,7 +52,7 @@ jobs:
       - run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --refresh-dependencies
       - uses: actions/upload-artifact@v4
         with:
           name: app-release
