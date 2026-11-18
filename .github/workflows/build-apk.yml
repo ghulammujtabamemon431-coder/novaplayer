@@ -38,15 +38,31 @@ jobs:
               if not os.path.exists(f):
                   make_png(f)
                   print("Created", f)
+          # package.json me version lazmi hai warna settings.gradle fail hota hai
+          if os.path.exists("package.json"):
+              with open("package.json") as fh:
+                  pj = json.load(fh)
+              if not pj.get("version"):
+                  pj["version"] = "1.0.0"
+              with open("package.json", "w") as fh:
+                  json.dump(pj, fh, indent=2)
+              print("package.json version:", pj.get("version"))
           if os.path.exists("app.json"):
               with open("app.json") as fh:
                   j = json.load(fh)
               expo = j.get("expo", j)
+              if not expo.get("version"):
+                  expo["version"] = "1.0.0"
+              if not expo.get("name"):
+                  expo["name"] = "novaplayer"
+              if not expo.get("slug"):
+                  expo["slug"] = "novaplayer"
               if "splash" in expo:
                   del expo["splash"]
                   print("Removed splash from app.json")
               with open("app.json", "w") as fh:
                   json.dump(j, fh, indent=2)
+              print("app.json version:", expo.get("version"))
           PY
       - run: npx expo prebuild --platform android --clean
       - run: |
@@ -58,7 +74,6 @@ jobs:
               t = t.replace("release {", "release {\n            signingConfig signingConfigs.debug", 1)
           p.write_text(t)
           print("Patched signing")
-          print(t[t.find("buildTypes"):t.find("buildTypes")+500])
           PY
       - run: |
           cd android
