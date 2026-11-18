@@ -37,8 +37,6 @@ jobs:
           for f in ["assets/icon.png", "assets/adaptive-icon.png", "assets/splash.png"]:
               if not os.path.exists(f):
                   make_png(f)
-                  print("Created", f)
-          # package.json me version lazmi hai warna settings.gradle fail hota hai
           if os.path.exists("package.json"):
               with open("package.json") as fh:
                   pj = json.load(fh)
@@ -46,7 +44,6 @@ jobs:
                   pj["version"] = "1.0.0"
               with open("package.json", "w") as fh:
                   json.dump(pj, fh, indent=2)
-              print("package.json version:", pj.get("version"))
           if os.path.exists("app.json"):
               with open("app.json") as fh:
                   j = json.load(fh)
@@ -59,15 +56,68 @@ jobs:
                   expo["slug"] = "novaplayer"
               if "splash" in expo:
                   del expo["splash"]
-                  print("Removed splash from app.json")
               with open("app.json", "w") as fh:
                   json.dump(j, fh, indent=2)
-              print("app.json version:", expo.get("version"))
           PY
       - run: npx expo prebuild --platform android --clean
       - run: |
           python3 - << 'PY'
-          import pathlib
+          import os, json, pathlib, glob
+          # 1. Har expo-module.config.json me publication.version fix karo
+          for cfg_path in glob.glob("node_modules/**/expo-module.config.json", recursive=True):
+              try:
+                  with open(cfg_path) as fh:
+                      cfg = json.load(fh)
+                  changed = False
+                  # package.json se version lo
+                  pkg_path = os.path.join(os.path.dirname(cfg_path), "package.json")
+                  ver = "1.0.0"
+                  if os.path.exists(pkg_path):
+                      with open(pkg_path) as pf:
+                          ver = json.load(pf).get("version") or "1.0.0"
+                  for plat in cfg.get("platforms", []):
+                      pass
+                  # android / ios ke andar publication ho sakta hai
+                  for key in list(cfg.keys()):
+                      if isinstance(cfg[key], dict) and "publication" in cfg[key]:
+                          pub = cfg[key]["publication"]
+                          if isinstance(pub, dict) and not pub.get("version"):
+                              pub["version"] = ver
+                              changed = True
+                  if "publication" in cfg and isinstance(cfg["publication"], dict) and not cfg["publication"].get("version"):
+                      cfg["publication"]["version"] = ver
+                      changed = True
+                  if changed:
+                      with open(cfg_path, "w") as fh:
+                          json.dump(cfg, fh, indent=2)
+                      print("Fixed", cfg_path)
+              except Exception as e:
+                  print("Skip", cfg_path, e)
+          # 2. Autolinking wali generated JSON me modules[4].projects[0].publication.version fix karo
+          for pat in ["android/**/expo-modules-autolinking*.json", "android/**/*.json", "**/expo-modules-autolinking.json"]:
+              for f in glob.glob(pat, recursive=True):
+                  try:
+                      with open(f) as fh:
+                          data = json.load(fh)
+                  except Exception:
+                      continue
+                  changed = False
+                  mods = data.get("modules") if isinstance(data, dict) else None
+                  if isinstance(mods, list):
+                      for m in mods:
+                          for proj in m.get("projects", []) if isinstance(m, dict) else []:
+                              pub = proj.get("publication") if isinstance(proj, dict) else None
+                              if isinstance(pub, dict) and not pub.get("version"):
+                                  pub["version"] = m.get("version") or "1.0.0"
+                                  changed = True
+                              if isinstance(proj, dict) and "publication" not in proj:
+                                  proj["publication"] = {"version": m.get("version") or "1.0.0"}
+                                  changed = True
+                  if changed:
+                      with open(f, "w") as fh:
+                          json.dump(data, fh, indent=2)
+                      print("Fixed autolinking", f)
+          # 3. Signing fix
           p = pathlib.Path("android/app/build.gradle")
           t = p.read_text()
           if "signingConfig signingConfigs.debug" not in t:
