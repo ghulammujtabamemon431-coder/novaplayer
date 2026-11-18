@@ -1,4 +1,3 @@
-
 name: Build APK
 on: [push]
 jobs:
@@ -17,6 +16,7 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: npm install
+      - run: npx expo install --fix
       - run: |
           mkdir -p assets
           python3 << 'PY'
@@ -36,7 +36,6 @@ jobs:
               if not os.path.exists(f):
                   make_png(f)
                   print("Created", f)
-          # Splash ko app.json se hata do taake prebuild splash pe na ruke
           if os.path.exists("app.json"):
               with open("app.json") as fh:
                   j = json.load(fh)
