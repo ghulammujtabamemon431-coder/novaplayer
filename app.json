@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "nova-player-",
-    "slug": "snack-108623ce-514d-43ff-87f5-92469bdc5cda",
+    "name": "Nova Player",
+    "slug": "nova-player",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,6 +16,7 @@
       "supportsTablet": true
     },
     "android": {
+      "compileSdkVersion": 37,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +26,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "description": "Video player "
+    "description": "Nova Player - All in One media player"
   }
 }
