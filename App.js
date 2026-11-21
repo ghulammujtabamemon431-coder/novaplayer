@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Video } from 'expo-av';
 import * as MediaLibrary from 'expo-media-library';
-import Voice from '@react-native-voice/voice';
+
 
 const getAutoCategory = (filename) => {
   const name = filename.toLowerCase();
