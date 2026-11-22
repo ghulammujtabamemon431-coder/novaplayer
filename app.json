@@ -16,7 +16,6 @@
       "supportsTablet": true
     },
     "android": {
-      "compileSdkVersion": 37,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -26,6 +25,18 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "description": "Nova Player - All in One media player"
+    "description": "Nova Player - All in One media player",
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 37,
+            "targetSdkVersion": 37,
+            "minSdkVersion": 24
+          }
+        }
+      ]
+    ]
   }
 }
