@@ -1,135 +1,117 @@
 name: Build APK
 
-on: [push]
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      CI: true
-      EXPO_NO_TELEMETRY: 1
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-      - uses: actions/setup-java@v4
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-      - run: npm install
-      - run: |
-          python3 - << 'PY'
-          import os, json, struct, zlib
-          def chunk(t, d):
-              c = t + d
-              import binascii
-              crc = binascii.crc32(c) & 0xffffffff
-              return struct.pack(">I", len(d)) + c + struct.pack(">I", crc)
-          def make_png(path):
-              os.makedirs(os.path.dirname(path), exist_ok=True)
-              raw = b"".join([b"\x00" + b"\xff\xff\xff\x00" * 512 for _ in range(512)])
-              data = b"\x89PNG\r\n\x1a\n"
-              data += chunk(b"IHDR", struct.pack(">IIBBBBB", 512, 512, 8, 6, 0, 0, 0))
-              data += chunk(b"IDAT", zlib.compress(raw))
-              data += chunk(b"IEND", b"")
-              open(path, "wb").write(data)
-          for f in ["assets/icon.png", "assets/adaptive-icon.png", "assets/splash.png"]:
-              if not os.path.exists(f):
-                  make_png(f)
-          if os.path.exists("package.json"):
-              with open("package.json") as fh:
-                  pj = json.load(fh)
-              if not pj.get("version"):
-                  pj["version"] = "1.0.0"
-              with open("package.json", "w") as fh:
-                  json.dump(pj, fh, indent=2)
-          if os.path.exists("app.json"):
-              with open("app.json") as fh:
-                  j = json.load(fh)
-              expo = j.get("expo", j)
-              if not expo.get("version"):
-                  expo["version"] = "1.0.0"
-              if not expo.get("name"):
-                  expo["name"] = "novaplayer"
-              if not expo.get("slug"):
-                  expo["slug"] = "novaplayer"
-              if "splash" in expo:
-                  del expo["splash"]
-              with open("app.json", "w") as fh:
-                  json.dump(j, fh, indent=2)
-          PY
-      - run: npx expo prebuild --platform android --clean
-      - run: |
-          python3 - << 'PY'
-          import os, json, pathlib, glob
-          # 1. Har expo-module.config.json me publication.version fix karo
-          for cfg_path in glob.glob("node_modules/**/expo-module.config.json", recursive=True):
-              try:
-                  with open(cfg_path) as fh:
-                      cfg = json.load(fh)
-                  changed = False
-                  # package.json se version lo
-                  pkg_path = os.path.join(os.path.dirname(cfg_path), "package.json")
-                  ver = "1.0.0"
-                  if os.path.exists(pkg_path):
-                      with open(pkg_path) as pf:
-                          ver = json.load(pf).get("version") or "1.0.0"
-                  for plat in cfg.get("platforms", []):
-                      pass
-                  # android / ios ke andar publication ho sakta hai
-                  for key in list(cfg.keys()):
-                      if isinstance(cfg[key], dict) and "publication" in cfg[key]:
-                          pub = cfg[key]["publication"]
-                          if isinstance(pub, dict) and not pub.get("version"):
-                              pub["version"] = ver
-                              changed = True
-                  if "publication" in cfg and isinstance(cfg["publication"], dict) and not cfg["publication"].get("version"):
-                      cfg["publication"]["version"] = ver
-                      changed = True
-                  if changed:
-                      with open(cfg_path, "w") as fh:
-                          json.dump(cfg, fh, indent=2)
-                      print("Fixed", cfg_path)
-              except Exception as e:
-                  print("Skip", cfg_path, e)
-          # 2. Autolinking wali generated JSON me modules[4].projects[0].publication.version fix karo
-          for pat in ["android/**/expo-modules-autolinking*.json", "android/**/*.json", "**/expo-modules-autolinking.json"]:
-              for f in glob.glob(pat, recursive=True):
-                  try:
-                      with open(f) as fh:
-                          data = json.load(fh)
-                  except Exception:
-                      continue
-                  changed = False
-                  mods = data.get("modules") if isinstance(data, dict) else None
-                  if isinstance(mods, list):
-                      for m in mods:
-                          for proj in m.get("projects", []) if isinstance(m, dict) else []:
-                              pub = proj.get("publication") if isinstance(proj, dict) else None
-                              if isinstance(pub, dict) and not pub.get("version"):
-                                  pub["version"] = m.get("version") or "1.0.0"
-                                  changed = True
-                              if isinstance(proj, dict) and "publication" not in proj:
-                                  proj["publication"] = {"version": m.get("version") or "1.0.0"}
-                                  changed = True
-                  if changed:
-                      with open(f, "w") as fh:
-                          json.dump(data, fh, indent=2)
-                      print("Fixed autolinking", f)
-          # 3. Signing fix
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Fix app.json for build
+        run: |
+          python3 - << 'PYEOF'
+          import json
+          with open('app.json') as f:
+              data = json.load(f)
+          expo = data.get('expo', {})
+          expo['version'] = '1.0.0'
+          expo['android'] = expo.get('android', {})
+          expo['android']['versionCode'] = 1
+          expo['android']['package'] = 'com.novamax.player'
+          if 'splash' in expo:
+              del expo['splash']
+          expo['plugins'] = [p for p in expo.get('plugins', []) if 'expo-splash-screen' not in str(p)]
+          with open('app.json','w') as f:
+              json.dump(data, f, indent=2)
+          print('app.json fixed')
+          PYEOF
+
+      - name: Expo Prebuild
+        run: npx expo prebuild --platform android --clean
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Patch android/app/build.gradle (Debug signing for release)
+        run: |
+          FILE=android/app/build.gradle
+          grep -n "signingConfig" "$FILE" || true
+          cp "$FILE" "${FILE}.bak"
+          python3 - << 'PYEOF'
+          import re, pathlib
           p = pathlib.Path("android/app/build.gradle")
           t = p.read_text()
-          if "signingConfig signingConfigs.debug" not in t:
+          t = re.sub(r"signingConfig\s+signingConfigs\.debug", "", t)
+          if "signingConfigs {" not in t:
+              t = t.replace("buildTypes {", "buildTypes {\n        signingConfigs {\n            debug {\n                storeFile file('debug.keystore')\n                storePassword 'android'\n                keyAlias 'androiddebugkey'\n                keyPassword 'android'\n            }\n        }\n")
+          if "release {" in t:
               t = t.replace("release {", "release {\n            signingConfig signingConfigs.debug", 1)
           p.write_text(t)
-          print("Patched signing")
-          PY
-      - run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
-      - uses: actions/upload-artifact@v4
+          print("patched")
+          PYEOF
+          cat "$FILE"
+
+      - name: Generate Debug Keystore
+        run: |
+          keytool -genkeypair -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -d "CN=Android Debug,O=Android,C=US"
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Release APK
+        run: |
+          cd android && ./gradlew assembleRelease --stacktrace
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: List APK
+        run: ls -lh android/app/build/outputs/apk/release/
+
+      - name: Copy APK to root for easy download
+        run: |
+          mkdir -p output
+          cp android/app/build/outputs/apk/release/app-release.apk output/NovaMax-v1.0.0.apk || cp android/app/build/outputs/apk/release/app-release-unsigned.apk output/NovaMax-v1.0.0.apk || true
+          ls -lh output/
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: NovaMax-APK
+          path: output/NovaMax-v1.0.0.apk
+          if-no-files-found: error
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-${{ github.run_number }}
+          name: NovaMax v1.0.0 Build ${{ github.run_number }}
+          body: |
+            NovaMax Player APK Build
+            Built from commit ${{ github.sha }}
+          body_path: null
+          files: output/NovaMax-v1.0.0.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
