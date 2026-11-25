@@ -37,7 +37,6 @@ jobs:
           expo['android'] = expo.get('android', {})
           expo['android']['versionCode'] = 1
           expo['android']['package'] = 'com.novamax.player'
-          # Icon / Splash ki wajah se Prebuild fail ho raha tha, is liye sab hata diya
           if 'icon' in expo:
               del expo['icon']
           if 'splash' in expo:
@@ -59,28 +58,23 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Patch android/app/build.gradle (Debug signing for release)
+      - name: Patch android/app/build.gradle (Use default debug signing for release)
         run: |
           FILE=android/app/build.gradle
-          grep -n "signingConfig" "$FILE" || true
           cp "$FILE" "${FILE}.bak"
           python3 - << 'PYEOF'
-          import re, pathlib
+          import pathlib
           p = pathlib.Path("android/app/build.gradle")
           t = p.read_text()
-          t = re.sub(r"signingConfig\s+signingConfigs\.debug", "", t)
-          if "signingConfigs {" not in t:
-              t = t.replace("buildTypes {", "buildTypes {\n        signingConfigs {\n            debug {\n                storeFile file('debug.keystore')\n                storePassword 'android'\n                keyAlias 'androiddebugkey'\n                keyPassword 'android'\n            }\n        }\n")
+          # Pehle se lagi hui koi debug signing line hata do taake double na ho
+          t = t.replace("signingConfig signingConfigs.debug", "")
+          # Release ko Gradle ke built-in debug keystore se sign karo, alag keystore banane ki zaroorat nahi
           if "release {" in t:
               t = t.replace("release {", "release {\n            signingConfig signingConfigs.debug", 1)
           p.write_text(t)
           print("patched")
           PYEOF
           cat "$FILE"
-
-      - name: Generate Debug Keystore
-        run: |
-          keytool -genkeypair -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -d "CN=Android Debug,O=Android,C=US"
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
