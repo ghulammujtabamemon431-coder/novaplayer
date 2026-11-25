@@ -37,8 +37,17 @@ jobs:
           expo['android'] = expo.get('android', {})
           expo['android']['versionCode'] = 1
           expo['android']['package'] = 'com.novamax.player'
+          # Icon / Splash ki wajah se Prebuild fail ho raha tha, is liye sab hata diya
+          if 'icon' in expo:
+              del expo['icon']
           if 'splash' in expo:
               del expo['splash']
+          if 'ios' in expo and 'icon' in expo['ios']:
+              del expo['ios']['icon']
+          if 'adaptiveIcon' in expo.get('android', {}):
+              del expo['android']['adaptiveIcon']
+          if 'foregroundImage' in expo.get('android', {}):
+              del expo['android']['foregroundImage']
           expo['plugins'] = [p for p in expo.get('plugins', []) if 'expo-splash-screen' not in str(p)]
           with open('app.json','w') as f:
               json.dump(data, f, indent=2)
