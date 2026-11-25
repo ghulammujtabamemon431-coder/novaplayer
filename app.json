@@ -4,35 +4,25 @@
     "slug": "nova-player",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "package": "com.novamax.player",
+      "versionCode": 1,
       "edgeToEdgeEnabled": true
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "description": "Nova Player - All in One media player",
+    "web": {},
     "plugins": [
+      "expo-av",
       [
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 37,
-            "targetSdkVersion": 37,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
             "minSdkVersion": 24
           }
         }
