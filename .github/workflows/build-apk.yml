@@ -58,6 +58,42 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Fix Expo Autolinking Publication version
+        run: |
+          python3 - << 'PYEOF'
+          import json, pathlib, glob
+          # Expo 54 me Publication ke liye 'version' zaroori hai, warna Gradle fail hota hai
+          for path in glob.glob("android/**/expo-modules-autolinking*.json", recursive=True):
+              print("Fixing:", path)
+              try:
+                  p = pathlib.Path(path)
+                  data = json.loads(p.read_text())
+                  def fix(obj):
+                      if isinstance(obj, dict):
+                          # Publication wali entry ko version de do agar missing hai
+                          if 'name' in obj and 'version' not in obj and ('android' in obj or 'sourceDir' in obj or 'packageName' in obj):
+                              obj['version'] = '1.0.0'
+                          for v in obj.values():
+                              fix(v)
+                      elif isinstance(obj, list):
+                          for v in obj:
+                              fix(v)
+                  fix(data)
+                  p.write_text(json.dumps(data, indent=2))
+              except Exception as e:
+                  print("skip", path, e)
+          # Agar alag naam se config hai to bhi check karo
+          for path in glob.glob("android/**/*.json", recursive=True):
+              try:
+                  txt = pathlib.Path(path).read_text()
+                  if '"Publication"' in txt or '"publications"' in txt:
+                      print("Found publication file:", path)
+              except:
+                  pass
+          print("autolinking fix done")
+          PYEOF
+          ls -R android | head -n 100
+
       - name: Patch android/app/build.gradle (Use default debug signing for release)
         run: |
           FILE=android/app/build.gradle
@@ -66,9 +102,7 @@ jobs:
           import pathlib
           p = pathlib.Path("android/app/build.gradle")
           t = p.read_text()
-          # Pehle se lagi hui koi debug signing line hata do taake double na ho
           t = t.replace("signingConfig signingConfigs.debug", "")
-          # Release ko Gradle ke built-in debug keystore se sign karo, alag keystore banane ki zaroorat nahi
           if "release {" in t:
               t = t.replace("release {", "release {\n            signingConfig signingConfigs.debug", 1)
           p.write_text(t)
